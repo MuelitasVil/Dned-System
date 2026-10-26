@@ -1,0 +1,69 @@
+from sqlalchemy.orm import Session
+from typing import List, Optional
+
+from app.repository.type_user_association_repository import (
+    TypeUserAssociationRepository
+)
+from app.domain.models.type_user_association import TypeUserAssociation
+from app.domain.dtos.type_user_association.type_user_association_input import (
+    TypeUserAssociationInput
+)
+
+
+class TypeUserAssociationService:
+    @staticmethod
+    def get_all(
+        session: Session, start: int = 0, limit: int = 100
+    ) -> List[TypeUserAssociation]:
+        repo = TypeUserAssociationRepository(session)
+        return repo.get_all(start=start, limit=limit)
+
+    @staticmethod
+    def get_by_id(
+        email_unal: str,
+        type_user_id: str,
+        cod_period: str,
+        session: Session
+    ) -> Optional[TypeUserAssociation]:
+        return TypeUserAssociationRepository(session).get_by_id(
+            email_unal,
+            type_user_id,
+            cod_period
+        )
+
+    @staticmethod
+    def create(
+        input_data: TypeUserAssociationInput,
+        session: Session
+    ) -> TypeUserAssociation:
+        assoc = TypeUserAssociation(**input_data.model_dump())
+        return TypeUserAssociationRepository(session).create(assoc)
+
+    @staticmethod
+    def delete(
+        email_unal: str,
+        type_user_id: str,
+        cod_period: str,
+        session: Session
+    ) -> bool:
+        return TypeUserAssociationRepository(session).delete(
+            email_unal,
+            type_user_id,
+            cod_period
+            )
+
+    @staticmethod
+    def bulk_insert_ignore(
+        users: List[TypeUserAssociationInput],
+        session: Session
+    ):
+        """
+        Inserta en bulk usuarios.
+        Si hay duplicados en email_unal, MySQL los ignora.
+        """
+        user_models = [
+            TypeUserAssociation(**user.model_dump()) for user in users
+        ]
+        return TypeUserAssociationRepository(session).bulk_insert_ignore(
+            user_models
+        )

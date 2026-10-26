@@ -1,0 +1,289 @@
+import asyncio
+from typing import List
+
+import httpx
+from app.utils.app_logger import AppLogger
+
+from app.domain.dtos.organization.headquarters_dto import HeadquartersDTO
+from app.domain.dtos.organization.school_headquarters_associate_dto import (
+    SchoolHeadquartersAssociateDTO as schClientDTO,
+)
+from app.domain.dtos.organization.unit_school_associate_dto import (
+    UnitSchoolAssociateDTO as unitSchoolDTO,
+)
+from app.domain.dtos.organization.email_dto import (
+    EmailDTO as Email,
+)
+
+from app.clients.organization.headquarters_client import (
+    HeadquartersClient as HqClient
+)
+from app.clients.organization.school_headquarters_associate_client import (
+    SchoolHeadquartersAssociateClient as SchHqClient,
+)
+from app.clients.organization.unit_school_associate_client import (
+    UnitSchoolAssociateClient as UnitSchClient,
+)
+from app.clients.organization.unit_unal_client import (
+    UnitUnalClient as UnitUnalClient,
+)
+from app.service.gam.gam_group_service import (
+    GamGroupService
+)
+
+logger = AppLogger(__file__, "update_unis_of_headquaters.log")
+semaphore = asyncio.Semaphore(20)
+
+
+async def update_units_of_headquarters(name: str, period: str) -> None:
+    headquarters: List[HeadquartersDTO] = await (
+        HqClient.fetch_headquarters_by_name(name)
+    )
+
+    logger.info(f"Period: {period}")
+    logger.info(f"Found {len(headquarters)} headquarters with name {name}")
+    # background_tasks.add_task(_loggerHeadQuarters, headquarters)
+    _loggerHeadQuarters(headquarters)
+
+    schools_in_headquarters: List[schClientDTO] = []
+    schools_in_headquarters = await _get_schools_in_headquarters(
+        period, headquarters
+    )
+    # background_tasks.add_task(
+    #     _loggerSchoolsInHeadquarters,
+    #     schools_in_headquarters
+    # )
+    _loggerSchoolsInHeadquarters(schools_in_headquarters)
+
+    logger.info(
+        f"Found {len(schools_in_headquarters)} schools in headquarters"
+    )
+
+    unit_in_schools: List[unitSchoolDTO] = []
+    unit_in_schools = await _get_units_in_schools(
+        period, schools_in_headquarters
+    )
+
+    # background_tasks.add_task(_loggerUnitsInSchools, unit_in_schools)
+    _loggerUnitsInSchools(unit_in_schools)
+
+    logger.info(f"Found {len(unit_in_schools)} units in schools")
+
+    units_email_senders: dict[str, List[Email]] = {}
+    units_email_senders = await _get_email_senders_by_units(
+        unit_in_schools, period
+    )
+
+    _loggerEmailsByUnits(units_email_senders)
+
+    await _delete_all_groups(units_email_senders)
+    await _create_all_groups(units_email_senders)
+
+    return {
+            "detail": f"Update of units for headquarters "
+            f"{name} in period {period} attempted",
+            "cant of updaated units": len(unit_in_schools)
+            }
+
+
+async def _get_schools_in_headquarters(
+    period: str,
+    headquarters: List[HeadquartersDTO],
+) -> List[schClientDTO]:
+    tasks = []
+    for hq in headquarters:
+        tasks.append(_fetch_schools_for_headquarter(hq, period))
+
+    all_schools = await asyncio.gather(*tasks)
+    schools_in_headquarters = [
+        school for sublist in all_schools for school in sublist
+    ]
+    return schools_in_headquarters
+
+
+async def _fetch_schools_for_headquarter(
+    hq: HeadquartersDTO,
+    period: str,
+) -> List[schClientDTO]:
+    async with semaphore:
+        try:
+            temp_schools: List[schClientDTO] = await (
+                SchHqClient.fetch_associations_by_headquarters(
+                    cod_headquarters=hq.cod_headquarters,
+                    period=period,
+                )
+            )
+            return temp_schools
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"HTTP {e.response.status_code} "
+                f"for headquarters {hq.cod_headquarters}"
+                f"error: {e}"
+            )
+            return []
+        except Exception as e:
+            logger.error(
+                f"Failed fetching associations for headquarters"
+                f"  {hq.cod_headquarters}: {e}"
+            )
+            return []
+
+
+async def _get_units_in_schools(
+    period: str,
+    schools_in_headquarters: List[schClientDTO],
+) -> List[unitSchoolDTO]:
+    tasks = [
+        fetch_units_for_school(sch, period)
+        for sch in schools_in_headquarters
+    ]
+    all_units = await asyncio.gather(*tasks)
+    unit_in_schools = [
+        unit for sublist in all_units for unit in sublist
+    ]
+    return unit_in_schools
+
+
+async def fetch_units_for_school(
+        sch: schClientDTO, period: str
+) -> List[unitSchoolDTO]:
+    async with semaphore:
+        try:
+            temp_units: List[unitSchoolDTO] = await (
+                UnitSchClient.fetch_associations_by_school(
+                    cod_school=sch.cod_school,
+                    period=period,
+                )
+            )
+            return temp_units
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"HTTP {e.response.status_code} "
+                f"for school {sch.cod_school}"
+                f"error: {e}"
+            )
+            return []
+        except Exception as e:
+            logger.error(
+                f"Failed fetching associations for school"
+                f" {sch.cod_school}: {e}")
+            return []
+
+
+async def _get_email_senders_by_units(
+    unit_in_schools: List[unitSchoolDTO],
+    period: str,
+) -> dict[str, List[Email]]:
+    tasks = [fetch_emails_for_unit(unit, period) for unit in unit_in_schools]
+    all_emails = await asyncio.gather(*tasks)
+    units_email_senders = {
+        unit.cod_unit: emails
+        for unit, emails
+        in zip(unit_in_schools, all_emails)
+    }
+    return units_email_senders
+
+
+async def fetch_emails_for_unit(
+    unit: unitSchoolDTO,
+    period: str
+) -> List[Email]:
+    async with semaphore:
+        try:
+            return await UnitUnalClient.fetch_email_list_of_unit(
+                cod_unit=unit.cod_unit,
+                period=period
+            )
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"HTTP {e.response.status_code} "
+                f"for unit {unit.cod_unit}"
+                f"error: {e}"
+            )
+            return []
+        except httpx.TimeoutException as e:
+            logger.error(
+                f"Timeout fetching emails for unit {unit.cod_unit}"
+                f"error: {e}"
+            )
+            return []
+        except Exception as e:
+            logger.error(
+                f"Unexpected error for unit {unit.cod_unit}"
+                f"error: {e}"
+            )
+            return []
+
+
+async def _delete_all_groups(
+    units_email_senders: dict[str, List[Email]]
+) -> None:
+    logger.info("Delete phase started")
+
+    tasks = [
+        asyncio.to_thread(GamGroupService.delete_group, cod_unit)
+        for cod_unit in units_email_senders.keys()
+    ]
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    failed = 0
+    for cod_unit, result in zip(units_email_senders.keys(), results):
+        if isinstance(result, Exception):
+            failed += 1
+            logger.error(
+                f"Unexpected error deleting group {cod_unit}: {result}"
+            )
+            continue
+        if result is False:
+            failed += 1
+
+    logger.info(
+        f"Delete phase completed."
+        f" total={len(units_email_senders)}, failed={failed}"
+    )
+
+
+async def _create_all_groups(
+    units_email_senders: dict[str, List[Email]]
+) -> None:
+    logger.info("Create phase started")
+
+    tasks = [
+        GamGroupService.update_group(cod_unit, emails)
+        for cod_unit, emails in units_email_senders.items()
+    ]
+
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+    logger.info(f"Create phase completed. total={len(units_email_senders)}")
+
+
+def _loggerHeadQuarters(headquarters: List[HeadquartersDTO]) -> None:
+    for hq in headquarters:
+        logger.info(f"Headquarters Code: {hq.cod_headquarters}")
+
+
+def _loggerSchoolsInHeadquarters(
+        schools_in_headquarters: List[schClientDTO]
+) -> None:
+    for sch in schools_in_headquarters:
+        logger.info(
+            f"School Code: {sch.cod_school}, "
+            f"Headquarters Code: {sch.cod_headquarters}"
+        )
+
+
+def _loggerUnitsInSchools(unit_in_schools: List[unitSchoolDTO]) -> None:
+    for unit in unit_in_schools:
+        logger.info(
+            f"Unit Code: {unit.cod_unit}, School Code: {unit.cod_school}"
+        )
+
+
+def _loggerEmailsByUnits(units_email_senders: dict[str, List[Email]]) -> None:
+    for cod_unit in units_email_senders.keys():
+        logger.info(f"Emails for Unit Code: {cod_unit}")
+        emails = units_email_senders[cod_unit]
+        for email in emails:
+            logger.info(f" - Email: {email}")

@@ -4,7 +4,7 @@ Monorepositorio que centraliza los componentes del sistema de administración de
 
 ---
 
-## 📂 Estructura del Repositorio
+## 📂 Estructura del repositorio
 
 ```text
 Dned-System/
@@ -14,33 +14,39 @@ Dned-System/
 │   └── BackEnd-DNED-GAM/
 ├── Tools/
 └── README.md
-Los componentes se incorporan al repositorio mediante Git Subtree. Cada módulo conserva su repositorio de origen y puede actualizarse de forma independiente.
+```
 
-🧩 Módulos
-1. DNED Backend (BackEnd-DNED-Organization)
-Tecnología: FastAPI, MySQL.
+Los componentes se incorporan al repositorio mediante Git subtree. Cada módulo conserva su repositorio de origen y puede actualizarse de forma independiente.
 
-Descripción: API principal que proporciona los servicios de lógica de negocio y persistencia para el sistema de administración. Su arquitectura basada en capas facilita la organización, el mantenimiento y la evolución del código.
+## 🧩 Módulos
 
-2. Front-Dned (Front-Dned)
-Descripción: Aplicación de interfaz de usuario. Permite a los operadores interactuar de forma intuitiva con las funcionalidades de administración de usuarios y licencias de Google y Microsoft.
+### 1. DNED Backend (`BackEnd-DNED-Organization`)
 
-3. GAM Backend (BackEnd-DNED-GAM)
-Tecnología: FastAPI, MySQL.
+**Tecnologías:** FastAPI y MySQL.
 
-Descripción: Servicio backend especializado en la integración y gestión de Google Apps Manager (GAM), operando como parte de la arquitectura modular del sistema.
+API principal que proporciona los servicios de lógica de negocio y persistencia de datos para el sistema de administración. Su arquitectura basada en capas facilita la organización, el mantenimiento y la evolución del código.
 
-⚙️ Requisitos Previos
-Git con soporte para git subtree.
+### 2. Front-Dned
 
-Acceso a los repositorios correspondientes en GitHub.
+Aplicación de interfaz de usuario que permite a los operadores interactuar con las funcionalidades de administración de usuarios y licencias de Google y Microsoft.
 
-Llave SSH configurada y autorizada en GitHub (en caso de utilizar clonación/conexión vía SSH).
+### 3. GAM Backend (`BackEnd-DNED-GAM`)
 
-🔄 Actualización de Módulos
-Para actualizar los submódulos desde la raíz del monorepositorio, ejecuta los siguientes comandos según corresponda:
+**Tecnologías:** FastAPI y MySQL.
 
-Bash
+Servicio backend especializado en la integración y gestión de Google Apps Manager (GAM), como parte de la arquitectura modular del sistema.
+
+## ⚙️ Requisitos previos
+
+- Git con soporte para `git subtree`.
+- Acceso a los repositorios correspondientes en GitHub.
+- Una llave SSH configurada y autorizada en GitHub, si se utilizan conexiones SSH.
+
+## 🔄 Actualización de módulos
+
+Desde la raíz del monorepositorio, ejecuta los comandos correspondientes:
+
+```bash
 # Actualizar el backend principal
 git subtree pull --prefix=system/BackEnd-DNED-Organization git@github.com:MuelitasVil/BackEnd-DNED-Organization.git main --squash
 
@@ -49,11 +55,16 @@ git subtree pull --prefix=system/Front-Dned git@github.com:MuelitasVil/Front-Dne
 
 # Actualizar el backend de GAM
 git subtree pull --prefix=system/BackEnd-DNED-GAM git@github.com:MuelitasVil/BackEnd-DNED-GAM.git main --squash
-Nota: Verifica que la rama principal de cada repositorio sea main. Si alguno de ellos utiliza master, ajusta el comando según sea necesario.
+```
 
-Luego, publica los cambios generales en el monorepositorio:
+Verifica que la rama principal de cada repositorio sea `main`. Si alguno utiliza `master`, ajusta el comando correspondiente.
 
-Bash
+Luego, publica los cambios del monorepositorio:
+
+```bash
 git push origin main
-🚀 Despliegue
-La configuración de despliegue y el archivo docker-compose se agregarán próximamente, una vez que se definan los puertos, las variables de entorno y los comandos de inicio de cada módulo.
+```
+
+## 🚀 Despliegue
+
+La configuración de despliegue y el archivo `docker-compose` se agregarán cuando se definan los puertos, las variables de entorno y los comandos de inicio de cada módulo.

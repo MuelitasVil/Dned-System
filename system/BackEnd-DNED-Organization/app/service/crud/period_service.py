@@ -1,0 +1,61 @@
+from app.domain.dtos.period.period_input import PeriodInput
+from app.domain.models.period import Period
+
+from app.exceptions.period_exceptions import (
+    InvalidPeriodDateError, PeriodNotFoundError
+)
+
+from app.repository.period_repository import PeriodRepository
+from sqlalchemy.orm import Session
+from typing import List, Optional
+
+
+class PeriodService:
+    @staticmethod
+    def get_all(
+        session: Session, start: int = 0, limit: int = 100
+    ) -> List[Period]:
+        repo = PeriodRepository(session)
+        return repo.get_all(start=start, limit=limit)
+
+    @staticmethod
+    def get_by_id(cod_period: str, session: Session) -> Optional[Period]:
+        repo = PeriodRepository(session)
+        return repo.get_by_id(cod_period)
+
+    @staticmethod
+    def create_period(input_period: PeriodInput, session: Session) -> Period:
+        repo = PeriodRepository(session)
+
+        intial_date = input_period.initial_date
+        final_date = input_period.final_date
+
+        if intial_date and final_date and intial_date > final_date:
+            raise InvalidPeriodDateError(
+                str(intial_date), str(final_date)
+            )
+
+        period = Period(**input_period.model_dump(exclude_unset=True))
+        return repo.create(period)
+
+    @staticmethod
+    def update_period(
+        cod_period: str,
+        input_period: PeriodInput,
+        session: Session
+    ) -> Optional[Period]:
+        repo = PeriodRepository(session)
+        return repo.update(cod_period, input_period)
+
+    @staticmethod
+    def delete_period(cod_period: str, session: Session) -> bool:
+        repo = PeriodRepository(session)
+        return repo.delete(cod_period)
+
+    @staticmethod
+    def get_required(cod_period: str, session: Session) -> Period:
+        repo = PeriodRepository(session)
+        period = repo.get_by_id(cod_period)
+        if not period:
+            raise PeriodNotFoundError(cod_period)
+        return period

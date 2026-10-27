@@ -47,7 +47,7 @@ Servicio backend especializado en la integración y gestión de Google Apps Mana
 Desde la raíz del monorepositorio, ejecuta los comandos correspondientes:
 
 ```bash
-# Actualizar el backend principal
+# Actualizar local el backend principal
 git subtree pull --prefix=system/BackEnd-DNED-Organization git@github.com:MuelitasVil/BackEnd-DNED-Organization.git main --squash
 
 # Actualizar el frontend
@@ -56,6 +56,18 @@ git subtree pull --prefix=system/Front-Dned git@github.com:MuelitasVil/Front-Dne
 # Actualizar el backend de GAM
 git subtree pull --prefix=system/BackEnd-DNED-GAM git@github.com:MuelitasVil/BackEnd-DNED-GAM.git main --squash
 ```
+
+```bash
+# Actualizar el backend principal
+git subtree push --prefix=system/BackEnd-DNED-GAM git@github.com:MuelitasVil/BackEnd-DNED-GAM.git main
+
+# Actualizar el frontend
+git subtree push --prefix=system/BackEnd-DNED-GAM git@github.com:MuelitasVil/BackEnd-DNED-GAM.git main
+
+# Actualizar el backend de GAM
+git subtree push --prefix=system/BackEnd-DNED-GAM git@github.com:MuelitasVil/BackEnd-DNED-GAM.git main
+```
+
 
 Verifica que la rama principal de cada repositorio sea `main`. Si alguno utiliza `master`, ajusta el comando correspondiente.
 

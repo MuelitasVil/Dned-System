@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # 1. Base de Datos MySQL
+  # ==========================================
+  db:
+    image: mysql:8.0
+    container_name: dned-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - dned-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # 2. BackEnd Organizacional (FastAPI)
+  # ==========================================
+  backend-organization:
+    build:
+      context: ./system/BackEnd-DNED-Organization
+      dockerfile: Dockerfile-python
+      target: development # Cambiar a 'production' si deseas la imagen optimizada final
+    container_name: dned-backend-org
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MYSQL_HOST=db
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - SECRET_KEY=${SECRET_KEY}
+      - WORKSPACE_MANAGER_URL=${WORKSPACE_MANAGER_URL}
+    volumes:
+      # Sincronización en vivo para desarrollo (puedes quitarlo en producción pura)
+      - ./system/BackEnd-DNED-Organization/app:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - dned-network
+
+  # ==========================================
+  # 3. BackEnd GAM (FastAPI + Google Apps Manager)
+  # ==========================================
+  backend-gam:
+    build:
+      context: ./system/BackEnd-DNED-GAM
+      dockerfile: Dockerfile
+    container_name: dned-backend-gam
+    restart: unless-stopped
+    ports:
+      - "8001:8000" # Mapeado al puerto 8001 externo como solicitaste
+    environment:
+      - GAM_WORKDIR=/var/lib/gam/work
+      - GAMCFGDIR=/var/lib/gam/config
+    volumes:
+      # Volumen persistente indispensable para que las credenciales OAuth de GAM no se borren
+      - gam_data:/var/lib/gam
+    networks:
+      - dned-network
+
+  # ==========================================
+  # 4. Front-End (Vite + Nginx)
+  # ==========================================
+  frontend:
+    build:
+      context: ./system/Front-Dned/organizacional-front
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:8000 # URL del backend organizacional vista desde el navegador del cliente
+    container_name: dned-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80" # Expone el puerto 3000 del host hacia el puerto 80 de Nginx dentro del contenedor
+    depends_on:
+      - backend-organization
+    networks:
+      - dned-network
+
+volumes:
+  mysql_data:
+  gam_data:
+
+networks:
+  dned-network:
+    driver: bridge

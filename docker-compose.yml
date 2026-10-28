@@ -46,6 +46,8 @@ services:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - SECRET_KEY=${SECRET_KEY}
       - WORKSPACE_MANAGER_URL=${WORKSPACE_MANAGER_URL}
+      - MYSQL_USER_PASSWORD=${MYSQL_USER_PASSWORD}
+      - MYSQL_ROOT=root
     volumes:
       # Sincronización en vivo para desarrollo (puedes quitarlo en producción pura)
       - ./system/BackEnd-DNED-Organization/app:/app
@@ -69,6 +71,13 @@ services:
     environment:
       - GAM_WORKDIR=/var/lib/gam/work
       - GAMCFGDIR=/var/lib/gam/config
+      - DNED_ORGANIZATION=${WORKSPACE_MANAGER_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - JOBS_DB_HOST=123
+      - JOBS_DB_PORT=123
+      - JOBS_DB_USER=123
+      - JOBS_DB_PASSWORD=123
+      - JOBS_DB_NAME=123
     volumes:
       # Volumen persistente indispensable para que las credenciales OAuth de GAM no se borren
       - gam_data:/var/lib/gam
@@ -80,7 +89,7 @@ services:
   # ==========================================
   frontend:
     build:
-      context: ./system/Front-Dned/organizacional-front
+      context: ./system/Front-Dned
       dockerfile: Dockerfile
       args:
         - VITE_API_URL=http://localhost:8000 # URL del backend organizacional vista desde el navegador del cliente
